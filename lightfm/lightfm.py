@@ -177,7 +177,7 @@ class LightFM(object):
         assert 0 < rho < 1
         assert epsilon >= 0
         assert learning_schedule in ('adagrad', 'adadelta')
-        assert loss in ('logistic', 'warp', 'bpr', 'warp-kos')
+        assert loss in ('logistic', 'warp', 'bpr', 'warp-kos', 'seen-warp')
 
         if max_sampled < 1:
             raise ValueError('max_sampled must be a positive integer')
@@ -421,28 +421,11 @@ class LightFM(object):
             raise ValueError('Not all input values are finite. '
                              'Check the input for NaNs and infinite values.')
 
-    @staticmethod
-    def _progress(n, verbose):
-        # Use `tqdm` if available,
-        # otherwise fallback to `range()`.
-        if not verbose:
-            return range(n)
-
-        try:
-            from tqdm import trange
-            return trange(n, desc="Epoch")
-        except ImportError:
-            def verbose_range():
-                for i in range(n):
-                    print("Epoch {}".format(i))
-                    yield i
-
-            return verbose_range()
-
     def fit(self, interactions,
             user_features=None, item_features=None,
             sample_weight=None,
-            epochs=1, num_threads=1, verbose=False):
+            epochs=1, num_threads=1, verbose=False,
+            seen_interactions=None):
         """
         Fit the model.
 
@@ -476,7 +459,9 @@ class LightFM(object):
              not be higher than the number of physical cores.
         verbose: bool, optional
              whether to print progress messages.
-             If `tqdm` is installed, a progress bar will be displayed instead.
+        seen_interactions: np.float32 coo_matrix of shape [n_users, n_items]
+             the matrix containing user-item interactions of items the user has seen but not interacted with.
+             Will be converted to numpy.float32 dtype if it is not of that type. To be used with 'seen-warp' loss.
 
         Returns
         -------
@@ -495,12 +480,14 @@ class LightFM(object):
                                 sample_weight=sample_weight,
                                 epochs=epochs,
                                 num_threads=num_threads,
-                                verbose=verbose)
+                                verbose=verbose,
+                                seen_interactions=seen_interactions)
 
     def fit_partial(self, interactions,
                     user_features=None, item_features=None,
                     sample_weight=None,
-                    epochs=1, num_threads=1, verbose=False):
+                    epochs=1, num_threads=1, verbose=False,
+                    seen_interactions=None):
         """
         Fit the model.
 
@@ -537,7 +524,9 @@ class LightFM(object):
              not be higher than the number of physical cores.
         verbose: bool, optional
              whether to print progress messages.
-             If `tqdm` is installed, a progress bar will be displayed instead.
+        seen_interactions: np.float32 coo_matrix of shape [n_users, n_items]
+             the matrix containing user-item interactions of items the user has seen.
+             Will be converted to numpy.float32 dtype if it is not of that type. To be used with 'seen-warp' loss.
 
         Returns
         -------
@@ -552,6 +541,17 @@ class LightFM(object):
 
         if interactions.dtype != CYTHON_DTYPE:
             interactions.data = interactions.data.astype(CYTHON_DTYPE)
+
+        if seen_interactions is not None:
+
+            # seen_interactions must be same shape as intersections
+            if not seen_interactions.shape == interactions.shape:
+                raise ValueError("seen_interactions must be the same shape as interactions")
+
+            seen_interactions = seen_interactions.tocoo()
+
+            if seen_interactions.dtype != CYTHON_DTYPE:
+                seen_interactions.data = seen_interactions.data.astype(CYTHON_DTYPE)
 
         sample_weight_data = self._process_sample_weight(interactions,
                                                          sample_weight)
@@ -568,6 +568,7 @@ class LightFM(object):
                            interactions.data,
                            sample_weight_data):
             self._check_input_finite(input_data)
+
         if self.item_embeddings is None:
             # Initialise latent factors only if this is the first call
             # to fit_partial.
@@ -583,29 +584,40 @@ class LightFM(object):
         if not user_features.shape[1] == self.user_embeddings.shape[0]:
             raise ValueError('Incorrect number of features in user_features')
 
-        for _ in self._progress(epochs, verbose=verbose):
+        for epoch in range(epochs):
+
+            if verbose:
+                print('Epoch %s' % epoch)
+
             self._run_epoch(item_features,
                             user_features,
                             interactions,
                             sample_weight_data,
                             num_threads,
-                            self.loss)
+                            self.loss,
+                            seen_interactions=seen_interactions)
 
             self._check_finite()
 
         return self
 
     def _run_epoch(self, item_features, user_features, interactions,
-                   sample_weight, num_threads, loss):
+                   sample_weight, num_threads, loss, seen_interactions=None):
         """
         Run an individual epoch.
         """
 
-        if loss in ('warp', 'bpr', 'warp-kos'):
+        if loss in ('warp', 'bpr', 'warp-kos', 'seen-warp'):
             # The CSR conversion needs to happen before shuffle indices are created.
             # Calling .tocsr may result in a change in the data arrays of the COO matrix,
             positives_lookup = CSRMatrix(
                 self._get_positives_lookup_matrix(interactions))
+
+            negatives_lookup = None
+
+        if loss == 'seen-warp':
+            negatives_lookup = CSRMatrix(
+                self._get_positives_lookup_matrix(seen_interactions))
 
         # Create shuffle indexes.
         shuffle_indices = np.arange(len(interactions.data), dtype=np.int32)
@@ -628,7 +640,28 @@ class LightFM(object):
                      self.item_alpha,
                      self.user_alpha,
                      num_threads,
-                     self.random_state)
+                     self.random_state,
+                     None)
+
+        elif loss == 'seen-warp':
+            # WARP variant that selects negatives from
+            # items seen by user but not interacted with.
+            fit_warp(CSRMatrix(item_features),
+                     CSRMatrix(user_features),
+                     positives_lookup,
+                     interactions.row,
+                     interactions.col,
+                     interactions.data,
+                     sample_weight,
+                     shuffle_indices,
+                     lightfm_data,
+                     self.learning_rate,
+                     self.item_alpha,
+                     self.user_alpha,
+                     num_threads,
+                     self.random_state,
+                     negatives_lookup)
+
         elif loss == 'bpr':
             fit_bpr(CSRMatrix(item_features),
                     CSRMatrix(user_features),
@@ -644,6 +677,7 @@ class LightFM(object):
                     self.user_alpha,
                     num_threads,
                     self.random_state)
+
         elif loss == 'warp-kos':
             fit_warp_kos(CSRMatrix(item_features),
                          CSRMatrix(user_features),

@@ -6,6 +6,7 @@ import numpy as np
 cimport cython.operator.dereference as deref
 from libc.stdlib cimport free, malloc
 
+
 {openmp_import}
 
 
@@ -794,9 +795,12 @@ def fit_warp(CSRMatrix item_features,
              double item_alpha,
              double user_alpha,
              int num_threads,
-             random_state):
+             random_state,
+             CSRMatrix seen_items):
     """
     Fit the model using the WARP loss.
+
+    Z is positive when a user saw an item.
     """
 
     cdef int i, no_examples, user_id, positive_item_id, gamma
@@ -808,6 +812,13 @@ def fit_warp(CSRMatrix item_features,
     cdef flt *pos_it_repr
     cdef flt *neg_it_repr
     cdef unsigned int[::1] random_states
+    cdef bint using_seen_items
+
+
+    using_seen_items = False
+
+    if seen_items is not None:
+      using_seen_items = True
 
     random_states = random_state.randint(0,
                                          np.iinfo(np.int32).max,
@@ -840,6 +851,7 @@ def fit_warp(CSRMatrix item_features,
                                    user_id,
                                    lightfm.user_scale,
                                    user_repr)
+
             compute_representation(item_features,
                                    lightfm.item_features,
                                    lightfm.item_biases,
@@ -857,8 +869,10 @@ def fit_warp(CSRMatrix item_features,
             while sampled < lightfm.max_sampled:
 
                 sampled = sampled + 1
-                negative_item_id = (rand_r(&random_states[{thread_num}])
-                                    % item_features.rows)
+
+
+                # choose a random item from the items a user has not interacted with
+                negative_item_id = rand_r(&random_states[{thread_num}]) % item_features.rows
 
                 compute_representation(item_features,
                                        lightfm.item_features,
@@ -875,8 +889,12 @@ def fit_warp(CSRMatrix item_features,
                 if negative_prediction > positive_prediction - 1:
 
                     # Sample again if the sample negative is actually a positive
-                    if in_positives(negative_item_id, user_id, interactions):
-                        continue
+                    if not using_seen_items:
+                        if not in_positives(negative_item_id, user_id, interactions):
+                            continue
+                    else:
+                        if not in_positives(negative_item_id, user_id, seen_items):
+                            continue
 
                     loss = weight * log(max(1.0, floor((item_features.rows - 1) / sampled)))
 
