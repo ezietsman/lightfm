@@ -7176,7 +7176,7 @@ static PyObject *__pyx_pf_7lightfm_23_lightfm_fast_no_openmp_2fit_warp(CYTHON_UN
  * 
  *                     # Sample again if the sample negative is actually a positive
  *                     if not using_seen_items:             # <<<<<<<<<<<<<<
- *                         if not in_positives(negative_item_id, user_id, interactions):
+ *                         if in_positives(negative_item_id, user_id, interactions):
  *                             continue
  */
               __pyx_t_2 = ((!(__pyx_v_using_seen_items != 0)) != 0);
@@ -7185,26 +7185,26 @@ static PyObject *__pyx_pf_7lightfm_23_lightfm_fast_no_openmp_2fit_warp(CYTHON_UN
                 /* "lightfm/_lightfm_fast_no_openmp.pyx":893
  *                     # Sample again if the sample negative is actually a positive
  *                     if not using_seen_items:
- *                         if not in_positives(negative_item_id, user_id, interactions):             # <<<<<<<<<<<<<<
+ *                         if in_positives(negative_item_id, user_id, interactions):             # <<<<<<<<<<<<<<
  *                             continue
  *                     else:
  */
-                __pyx_t_2 = ((!(__pyx_f_7lightfm_23_lightfm_fast_no_openmp_in_positives(__pyx_v_negative_item_id, __pyx_v_user_id, __pyx_v_interactions) != 0)) != 0);
+                __pyx_t_2 = (__pyx_f_7lightfm_23_lightfm_fast_no_openmp_in_positives(__pyx_v_negative_item_id, __pyx_v_user_id, __pyx_v_interactions) != 0);
                 if (__pyx_t_2) {
 
                   /* "lightfm/_lightfm_fast_no_openmp.pyx":894
  *                     if not using_seen_items:
- *                         if not in_positives(negative_item_id, user_id, interactions):
+ *                         if in_positives(negative_item_id, user_id, interactions):
  *                             continue             # <<<<<<<<<<<<<<
  *                     else:
- *                         if not in_positives(negative_item_id, user_id, seen_items):
+ *                         if not in_positives(negative_item_id, user_id, seen_items) or in_positives(negative_item_id, user_id, interactions):
  */
                   goto __pyx_L10_continue;
 
                   /* "lightfm/_lightfm_fast_no_openmp.pyx":893
  *                     # Sample again if the sample negative is actually a positive
  *                     if not using_seen_items:
- *                         if not in_positives(negative_item_id, user_id, interactions):             # <<<<<<<<<<<<<<
+ *                         if in_positives(negative_item_id, user_id, interactions):             # <<<<<<<<<<<<<<
  *                             continue
  *                     else:
  */
@@ -7214,7 +7214,7 @@ static PyObject *__pyx_pf_7lightfm_23_lightfm_fast_no_openmp_2fit_warp(CYTHON_UN
  * 
  *                     # Sample again if the sample negative is actually a positive
  *                     if not using_seen_items:             # <<<<<<<<<<<<<<
- *                         if not in_positives(negative_item_id, user_id, interactions):
+ *                         if in_positives(negative_item_id, user_id, interactions):
  *                             continue
  */
                 goto __pyx_L13;
@@ -7223,17 +7223,25 @@ static PyObject *__pyx_pf_7lightfm_23_lightfm_fast_no_openmp_2fit_warp(CYTHON_UN
               /* "lightfm/_lightfm_fast_no_openmp.pyx":896
  *                             continue
  *                     else:
- *                         if not in_positives(negative_item_id, user_id, seen_items):             # <<<<<<<<<<<<<<
+ *                         if not in_positives(negative_item_id, user_id, seen_items) or in_positives(negative_item_id, user_id, interactions):             # <<<<<<<<<<<<<<
  *                             continue
  * 
  */
               /*else*/ {
-                __pyx_t_2 = ((!(__pyx_f_7lightfm_23_lightfm_fast_no_openmp_in_positives(__pyx_v_negative_item_id, __pyx_v_user_id, __pyx_v_seen_items) != 0)) != 0);
+                __pyx_t_1 = ((!(__pyx_f_7lightfm_23_lightfm_fast_no_openmp_in_positives(__pyx_v_negative_item_id, __pyx_v_user_id, __pyx_v_seen_items) != 0)) != 0);
+                if (!__pyx_t_1) {
+                } else {
+                  __pyx_t_2 = __pyx_t_1;
+                  goto __pyx_L16_bool_binop_done;
+                }
+                __pyx_t_1 = (__pyx_f_7lightfm_23_lightfm_fast_no_openmp_in_positives(__pyx_v_negative_item_id, __pyx_v_user_id, __pyx_v_interactions) != 0);
+                __pyx_t_2 = __pyx_t_1;
+                __pyx_L16_bool_binop_done:;
                 if (__pyx_t_2) {
 
                   /* "lightfm/_lightfm_fast_no_openmp.pyx":897
  *                     else:
- *                         if not in_positives(negative_item_id, user_id, seen_items):
+ *                         if not in_positives(negative_item_id, user_id, seen_items) or in_positives(negative_item_id, user_id, interactions):
  *                             continue             # <<<<<<<<<<<<<<
  * 
  *                     loss = weight * log(max(1.0, floor((item_features.rows - 1) / sampled)))
@@ -7243,7 +7251,7 @@ static PyObject *__pyx_pf_7lightfm_23_lightfm_fast_no_openmp_2fit_warp(CYTHON_UN
                   /* "lightfm/_lightfm_fast_no_openmp.pyx":896
  *                             continue
  *                     else:
- *                         if not in_positives(negative_item_id, user_id, seen_items):             # <<<<<<<<<<<<<<
+ *                         if not in_positives(negative_item_id, user_id, seen_items) or in_positives(negative_item_id, user_id, interactions):             # <<<<<<<<<<<<<<
  *                             continue
  * 
  */
@@ -7336,11 +7344,11 @@ static PyObject *__pyx_pf_7lightfm_23_lightfm_fast_no_openmp_2fit_warp(CYTHON_UN
           if (!__pyx_t_1) {
           } else {
             __pyx_t_2 = __pyx_t_1;
-            goto __pyx_L18_bool_binop_done;
+            goto __pyx_L20_bool_binop_done;
           }
           __pyx_t_1 = ((__pyx_v_lightfm->user_scale > __pyx_v_7lightfm_23_lightfm_fast_no_openmp_MAX_REG_SCALE) != 0);
           __pyx_t_2 = __pyx_t_1;
-          __pyx_L18_bool_binop_done:;
+          __pyx_L20_bool_binop_done:;
           if (__pyx_t_2) {
 
             /* "lightfm/_lightfm_fast_no_openmp.pyx":920

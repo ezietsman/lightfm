@@ -6,6 +6,7 @@ import numpy as np
 cimport cython.operator.dereference as deref
 from libc.stdlib cimport free, malloc
 
+
 {openmp_import}
 
 
@@ -811,12 +812,12 @@ def fit_warp(CSRMatrix item_features,
     cdef flt *pos_it_repr
     cdef flt *neg_it_repr
     cdef unsigned int[::1] random_states
-    cdef bool using_seen_items
+    cdef bint using_seen_items
 
 
     using_seen_items = False
 
-    if seen_items:
+    if seen_items is not None:
       using_seen_items = True
 
     random_states = random_state.randint(0,
@@ -889,11 +890,11 @@ def fit_warp(CSRMatrix item_features,
 
                     # Sample again if the sample negative is actually a positive
                     if not using_seen_items:
-                      if not in_positives(negative_item_id, user_id, interactions):
-                          continue
+                        if in_positives(negative_item_id, user_id, interactions):
+                            continue
                     else:
-                      if not in_positives(negative_item_id, user_id, seen_items):
-                          continue
+                        if not in_positives(negative_item_id, user_id, seen_items) or in_positives(negative_item_id, user_id, interactions):
+                            continue
 
                     loss = weight * log(max(1.0, floor((item_features.rows - 1) / sampled)))
 
